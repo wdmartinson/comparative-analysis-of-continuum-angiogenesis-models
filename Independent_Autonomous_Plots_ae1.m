@@ -1,16 +1,21 @@
 function Rel_error = Independent_Autonomous_Plots_ae1
 LW = 'linewidth'; IN = 'interpreter'; LA = 'latex'; FS = 'fontsize'; PS = 'position'; position = [31, 60, 550, 432];
 FN = 'fontname'; AR = 'arial'; 
-load(['/Users/duncanmartinson/Documents/MATLAB/Oxford/Angiogenesis Models/',...
-    '8jul2020_LargerDomain_OriginalModels_ae1_Lambda1e-2_1e-3_TCInitCond.mat']);
-original_plots = false; save_yes_no = false; bvp = true;
-lambda = 0.01; mu = 160; D = 1e-3; chi = 0.4; eps = D*lambda/chi^2; a_e = 1;
+load(['./',...
+    '9apr2020_Plots_LargerDomain_AutonomousAndIndependent_Models_BaselineParameters_ae1.mat']);
+%      '8jul2020_LargerDomain_OriginalModels_ae1_Lambda1e-2_1e-3_TCInitCond.mat']);
+
+original_plots = false; save_yes_no = false; bvp = false;
+% lambda = 0.01; mu = 160; D = 1e-3; chi = 0.4; eps = D*lambda/chi^2; a_e = 1;
+
+lambda = 0.16; mu = 160; D = 1e-3; chi = 0.4; eps = sqrt(D*lambda)/chi; a_e = 1;
 
 U_BC = mu/lambda*BCModel_TipCellDensity;
 U_Pillay = mu/lambda*PillayModel_TipCellDensity;
 W_BC = mu/lambda*a_e*BCModel_StalkCellDensity;
 W_Pillay = mu/lambda*a_e*PillayModel_StalkCellDensity;
-X = lambda/chi*Omega;
+% X = lambda/chi*Omega;
+X = sqrt(lambda/D)*Omega;
 Tau = lambda*(TimeMesh);
 
 jj = length(Tau);
@@ -144,16 +149,17 @@ z = linspace(-10, 10, 2001)';
 figure;
 l = @(z) Tau(65+64)^(0.5).*max(U_BC(:,65+64)).*exp(-z.^2./4);
 for i = 65+64:65+64*11
-ll = interp1(z.*sqrt(eps*Tau(i))+X_0+s*Tau(i), Tau(i)^(-0.5).*l(z), X);
+ll = interp1(z.*sqrt(Tau(i))+X_0+s*Tau(i), Tau(i)^(-0.5).*l(z), X);
 Rel_error(i) = max( [max( abs(ll-U_BC(:,i))./max(max([U_BC(:,i), U_Pillay(:,i), ll], [], 1)) ), max( abs(ll-U_Pillay(:,i))./max(max([U_BC(:,i), U_Pillay(:,i), ll], [], 1)) )] );
     if ~mod(i-1,64)
-        plot(z.*sqrt(eps*Tau(i))+X_0+s*Tau(i), Tau(i)^(-0.5).*l(z), '-.k', 'linewidth', 1); hold on;
+%         plot(z.*sqrt(eps*Tau(i))+X_0+s*Tau(i), Tau(i)^(-0.5).*l(z), '-.k', 'linewidth', 1); hold on;
+        plot(z.*sqrt(Tau(i))+X_0+s*Tau(i), Tau(i)^(-0.5).*l(z), '-.k', 'linewidth', 1); hold on;
     end % if
 end
 Rel_error = nonzeros(Rel_error);
 plot(X, U_Pillay(:, 65+64:64:65+64*11), 'b');
 plot(X, U_BC(:, 65+64:64:65+64*11), '--r');
-xlim([0 .1])
+xlim([0 10])
 ylim([0 0.05])
 set(gcf, 'position', position);
 set(gca, 'fontname', 'arial', 'fontsize', 16);
@@ -162,6 +168,9 @@ ylabel('$u(X,\tau)$', 'fontsize', 20, 'interpreter', 'latex');
 title('Exponential function');
 
 figure;
-plot(Tau(65+64:65+64*11), Rel_error);
-title('Relative error with self-similar solution');
+plot(Tau(65+64:65+64*11), Rel_error, 'k', LW, 1);
+set(gcf, 'position', position);
+xlabel('$\tau$', 'fontsize', 20, 'interpreter', 'latex');
+ylabel('$\max\Big[\frac{\max\{||u_{sim}(X,\tau)-u_{ST}(X,\tau)||_{\infty}, \ ||u_{sim}(X,\tau)-u_{P}(X,\tau)||_{\infty}\}}{\max\{||u_{ST}(X,\tau)||_\infty, \ ||u_{P}(X,\tau)||_\infty, \ ||u_{sim}(X,\tau)||_\infty\}}\Big]$', 'interpreter', 'latex', 'fontsize', 20);
+set(gca, 'fontname', 'arial', 'fontsize', 20);
 end
