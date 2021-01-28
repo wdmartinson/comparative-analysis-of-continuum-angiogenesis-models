@@ -11,6 +11,7 @@ function [BCModel_StalkCellDensity, BCModel_TipCellDensity, Omega, TimeMesh] = S
 % y-direction, at t = 0.2 (and are linearly interpolated onto the PDE mesh
 % Omega).
 %--------------------------------------------------------------------------
+use_original_STPDE = true;
 %% Set up Domain, Initialize Parameters, Set Initial Condition
 % Space-Time Domain:
 Omega = linspace(0, 1, 201)'; % X-Coordinates
@@ -24,7 +25,7 @@ h = 1/200;
 dcdx = 1; C0 = 0;
 % beta_n = 160; chi = beta_n*k*h^2/dcdx; D = beta_n*h^2/4; 
 % beta_e = 0.0391*beta_n; lambda = 0.16; kappa = 2;
-beta_n = 160; chi = 0.4; D = 1e-3; lambda = 16; a_n = 1; beta_e = 0.0391*beta_n;
+beta_n = 160; chi = 0.4; D = 1e-3; lambda = 0.16; a_n = 1; beta_e = 0.0391*beta_n;
 kappa = beta_n/chi*h;
 
 
@@ -41,18 +42,29 @@ c = C0.*ones(size(c)) + dcdx.*c;
 
 e = ones(N,1);
 
+
 % Use Block Sparse Matrices to define matrix system for MOL ode below:
 N_N = spdiags([(D/Dx/Dx+chi*dcdx/2/Dx)*e,...
     (-2*D/Dx/Dx)*e, (D/Dx/Dx-chi*dcdx/2/Dx)*e], -1:1, N, N);
 
-% Establish BCs
-% Neumann BC @ x = 0
-N_N(1,1) = -2*D/Dx/Dx-2*chi*dcdx/Dx-(chi*dcdx)^2/D;
-N_N(1,2) = 2*D/Dx/Dx;
+if use_original_STPDE
+    % Establish BCs
+    % Neumann BC @ x = 0
+    N_N(1,1) = -2*D/Dx/Dx-2*chi*dcdx/Dx-(chi*dcdx)^2/D;
+    N_N(1,2) = 2*D/Dx/Dx;
 
-% Neumann BC @ x = 1
-N_N(end,end-1) = 2*D/Dx/Dx;
-N_N(end,end) = -2*D/Dx/Dx + 2*(chi*dcdx)/Dx-(chi*dcdx)^2/D;
+    % Neumann BC @ x = L
+    N_N(end,end-1) = 2*D/Dx/Dx;
+    N_N(end,end) = -2*D/Dx/Dx + 2*(chi*dcdx)/Dx-(chi*dcdx)^2/D;
+else
+    % Dirichlet BC @ x = 0
+    N_N(1,1) = 1;
+    N_N(1,2) = 0;
+    
+    % Dirichlet BC @ x = L
+    N_N(end,end-1) = 0;
+    N_N(end,end) = 1;
+end
 
 E_N = spdiags([(-D/Dx-chi*dcdx)*e, (D/Dx)*e], 0:1, N, N);
 E_N(1,1) = 0; % No flux at boundary
@@ -75,6 +87,14 @@ BCModel_TipCellDensity = Sols(:, N+1:2*N)';
         b(N+1:2*N) = lambda*n.*c - beta_e*n.*p - beta_n*n.^2;
 
         dzdt = A*z + b;
-        dzdt(1:N) = kappa/h*abs(dzdt(1:N));
+        % Original ST--PDE:
+        if use_original_STPDE
+            dzdt(1:N) = kappa/h*abs(dzdt(1:N));
+        else
+            % Leading Order Dynamics:
+            dzdt(1:N) = beta_n*n;
+            dzdt(N+1) = 0; % Dirichlet BC
+            dzdt(end) = 0; % Dirichlet BC
+        end
     end % function MOL_ODE_Byrne_Chaplain_Model
 end % function Byrne_Chaplain_Model

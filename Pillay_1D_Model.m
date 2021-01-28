@@ -12,6 +12,7 @@ function [PillayModel_StalkCellDensity, PillayModel_TipCellDensity, Omega, TimeM
 % y-direction, at t = 0.2 (and are linearly interpolated onto the PDE mesh
 % Omega).
 %--------------------------------------------------------------------------
+use_original_PPDE = true;
 %% Set up Domain, Initialize Parameters, Set Initial Condition
 % Space-Time Domain:
 Omega = linspace(0, 1, 201)'; % X-Coordinates
@@ -22,7 +23,7 @@ Dx = Omega(2);
 k = 100;
 h = 1/200;
 dcdx = 1; C0 = 0;
-mu = 160; chi = 0.4; D = 1e-3; lambda = 16; a_n = 1; a_e = 0.0391;
+mu = 160; chi = 0.4; D = 1e-3; lambda = 0.16; a_n = 1; a_e = 0.0391;
 % mu = 160; chi = mu*k*h^2; D = mu*h^2/4; lambda = 0.16; a_n = 1; a_e = 0.0391;
 
 % Initial Condition, specified as a large vector
@@ -39,10 +40,19 @@ e = ones(N,1);
 % Use Block Sparse Matrices to define matrix system for MOL ode below:
 A = spdiags([(D/Dx/Dx+chi/2/Dx)*e,...
         (-2*D/Dx/Dx)*e, (D/Dx/Dx-chi/2/Dx)*e], -1:1, N, N);
-A(1,1) = -2*D/Dx/Dx-2*chi/Dx-chi^2/D;
-A(1,2) = 2*D/Dx/Dx;
-A(end,end-1) = 2*D/Dx/Dx;
-A(end,end) = -2*D/Dx/Dx + 2*chi/Dx-chi^2/D;
+if use_original_PPDE
+    % No-flux BCs
+    A(1,1) = -2*D/Dx/Dx-2*chi/Dx-chi^2/D;
+    A(1,2) = 2*D/Dx/Dx;
+    A(end,end-1) = 2*D/Dx/Dx;
+    A(end,end) = -2*D/Dx/Dx + 2*chi/Dx-chi^2/D;
+else
+    % Diriclet BCs
+    A(1,1) = 1;
+    A(1,2) = 0;
+    A(end,end-1) = 0;
+    A(end,end) = 1;
+end
 
 %% Solve the PDE using the Method of Lines
 opts = odeset('MaxStep', min([Dx/chi,Dx^2/2/D]));
@@ -56,7 +66,15 @@ PillayModel_TipCellDensity = Sols(:, N+1:2*N)';
         % differencing for 2nd order derivatives
         p = z(1:N); n = z(N+1:2*N);
         dndt = (1-a_n*n-a_e*p).*(A*n) + lambda*n.*c - mu*(a_n*n.^2+a_e*n.*p);
-        dpdt = mu*n+a_n*n.*(mu*n+A*n);
+        if use_original_PPDE
+            % Original P--PDE
+            dpdt = mu*n+a_n*n.*(mu*n+A*n);
+        else
+            % Leading Order Dynamics
+            dpdt = mu*n;
+            dndt(1) = 0; % Dirichlet BCs
+            dndt(end) = 0; % Diriclet BCs
+        end
         
         dzdt = [dpdt; dndt];
     end % function MOL_ODE_Byrne_Chaplain_Model
