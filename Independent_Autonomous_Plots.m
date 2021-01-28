@@ -1,10 +1,17 @@
 function [Rel_error, Rel_error2, Rel_error3] = Independent_Autonomous_Plots
 LW = 'linewidth'; IN = 'interpreter'; LA = 'latex'; FS = 'fontsize'; PS = 'position'; position = [31, 60, 550, 432];
 FN = 'fontname'; AR = 'arial'; 
-load(['/Users/duncanmartinson/Documents/MATLAB/Oxford/Angiogenesis Models/',...
-    '9apr2020_Plots_LargerDomain_AutonomousAndIndependent_Models_BaselineParameters.mat']);
-original_plots = false; save_yes_no = false; bvp = true;
-lambda = 0.16; mu = 160; D = 1e-3; chi = 0.4; eps = D*lambda/chi^2; a_e = 0.0391; beta = a_e*mu/lambda;
+load(['./',...
+            '9apr2020_Plots_LargerDomain_AutonomousAndIndependent_Models_BaselineParameters.mat']);
+
+%          '11apr2020_Plots_LargerDomain_OriginalModels_Chi4e-2_BaselineInitCond.mat']);
+
+    %     '9apr2020_Plots_LargerDomain_AutonomousAndIndependent_Models_Lambda10_WideTildeLambda5.mat']);
+%         '11apr2020_Plots_LargerDomain_OriginalModels_D1e-1_BaselineInitCond.mat']);
+
+original_plots = false; save_yes_no = false; bvp = false;
+% lambda = 0.16; mu = 160; D = 1e-3; chi = 0.4; eps = D*lambda/chi^2; a_e = 0.0391; beta = a_e*mu/lambda;
+lambda = 0.16; mu = 160; D = 1e-3; chi = 0.4; eps = sqrt(D*lambda)/chi; a_e = 0.0391; beta = a_e*mu/lambda;
 C0 = 0; dcdx = 1;
 
 filename = 'R_28may2020_LargerDomain_OriginalModels_KazTWTest_DcDx_5e-1_C0_0_BaselineInitCond';
@@ -13,7 +20,8 @@ U_BC = mu/lambda*BCModel_TipCellDensity;
 U_Pillay = mu/lambda*PillayModel_TipCellDensity;
 W_BC = mu/lambda*a_e*BCModel_StalkCellDensity;
 W_Pillay = mu/lambda*a_e*PillayModel_StalkCellDensity;
-X = lambda/chi*Omega;
+% X = lambda/chi*Omega;
+X = sqrt(lambda/D)*Omega;
 Tau = lambda*(TimeMesh);
 
 % jj = find(Tau == 9.8*lambda);
@@ -173,7 +181,8 @@ s = speed(1);
 % X_0 = X(ind)-s*Tau(1);
 X_0 = speed(2);
 for i = 1:length(Tau)
-z(:, i) = (X-s*(Tau(i))-X_0)./sqrt(eps*Tau(i));
+% z(:, i) = (X-s*(Tau(i))-X_0)./sqrt(eps*Tau(i));
+z(:, i) = (X-s*(Tau(i))-X_0)./sqrt(Tau(i))./eps;
 U_BC_Rescaled(:,i) = U_BC(:,i).*Tau(i).^(1);
 U_Pillay_Rescaled(:,i) = U_Pillay(:,i).*Tau(i).^(1);
 end
@@ -187,8 +196,8 @@ for i = 1:5
 plot(z(:,65+64*(i-1)), U_BC_Rescaled(:,65+64*(i-1)), 'linestyle', '--', 'color', colors(i,:)); hold on;
 end
 legend('$\tau = 0.6\lambda$', '$\tau = \lambda$', '$\tau = 1.4\lambda$', '$\tau = 1.8\lambda$', '$\tau = 2.2\lambda$', 'interpreter', 'latex', 'fontsize', 14);
-N = chebop(-10, 10);
-N.init = chebfun('exp(-x.^2)', [-10, 10]);
+N = chebop(-100, 100);
+N.init = chebfun('exp(-x.^2)', [-100, 100]);
 N.op = @(x,y) diff(y,2)+x./2.*diff(y)+y-y.^2; N.lbc = 0; N.rbc = 0;
 g = N\0;
 delta = max_u*Tau(1)^(1)/max(g);
@@ -199,20 +208,22 @@ xlabel('$z$', 'fontsize', 20, 'interpreter', 'latex');
 ylabel('$\widetilde{U}(z)$', 'fontsize', 20, 'interpreter', 'latex');
 set(gca, 'fontname', 'arial', 'fontsize', 16)
 
-z = linspace(-10, 10, 2001)';
+z = linspace(-100, 100, 20001)';
 Rel_error = zeros(length(1:65+64*11), 1);
 Rel_error2 = Rel_error;
 Rel_error3 = Rel_error;
 figure;
 C1 = max(U_BC(:,1)).*Tau(1);
 for i = 1:65+64*11
-gg = interp1(z.*sqrt(eps*Tau(i))+X_0+s*Tau(i), 1./Tau(i).*g(z), X);
+% gg = interp1(z.*sqrt(eps*Tau(i))+X_0+s*Tau(i), 1./Tau(i).*g(z), X);
+gg = interp1(z.*eps.*sqrt(Tau(i))+X_0+s*Tau(i), 1./Tau(i).*g(z), X);
 Rel_error(i) = max( [max( abs(gg-U_BC(:,i))./max(max([U_BC(:,i), U_Pillay(:,i), gg], [], 1)) ), max( abs(gg-U_Pillay(:,i))./max(max([U_BC(:,i), U_Pillay(:,i), gg], [], 1)) )] );
 h = @(r) 1./(498*r.^2+1).*C1;
 hh = 1./Tau(i).*h((X-s*Tau(i)-X_0)./sqrt(Tau(i)));
 Rel_error2(i) = max( abs(hh-gg))./max(max([hh,gg], [], 1));
     if ~mod(i-1,64)
-        plot(z.*sqrt(eps*Tau(i))+X_0+s*Tau(i), 1./Tau(i).*g(z), '-.k', 'linewidth', 1); hold on;
+%         plot(z.*sqrt(eps*Tau(i))+X_0+s*Tau(i), 1./Tau(i).*g(z), '-.k', 'linewidth', 1); hold on;
+        plot((z.*sqrt(Tau(i))+X_0+s*Tau(i)), 1./Tau(i).*g(z), '-.k', 'linewidth', 1); hold on;
     end % if
 end
 Rel_error = nonzeros(Rel_error);
